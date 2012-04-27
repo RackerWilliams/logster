@@ -86,6 +86,8 @@ cmdline.add_option('--state-dir', '-s', action='store', default=state_dir,
 cmdline.add_option('--output', '-o', action='append',
                    choices=('graphite', 'ganglia', 'stdout'),
                    help="Where to send metrics (can specify multiple times). Choices are 'graphite', 'ganglia', or 'stdout'.")
+cmdline.add_option('--ignore-duration', '-i', action='store_true', default=False,
+                   help="Ignore duration, useful when processing old logs. The parser must be able to derive the duration from the log file to support this feature!")
 cmdline.add_option('--dry-run', '-d', action='store_true', default=False,
                     help='Parse the log file but send stats to standard output.')
 cmdline.add_option('--debug', '-D', action='store_true', default=False,
@@ -271,12 +273,16 @@ def main():
 
         except OSError, e:
             logger.info('Writing new state file and exiting. (Was either first run, or state file went missing.)')
-            input = os.popen(shell_tail)
-            retval = input.close()
-            if (retval != 256):
-                logger.warning('%s returned bad exit code %s' % (shell_tail, retval))
-            end_locking(lockfile, logtail_lock_file)
-            sys.exit(0)
+            if (not options.ignore_duration):
+                input = os.popen(shell_tail)
+                retval = input.close()
+                if (retval != 256):
+                    logger.warning('%s returned bad exit code %s' % (shell_tail, retval))
+                end_locking(lockfile, logtail_lock_file)
+                sys.exit(0)
+            else:
+                logger.info('New state file with ignore-duration=true, setting a duration of 0.')
+                duration = 0
 
         # Open a pipe to read input from logtail.
         input = os.popen(shell_tail)
